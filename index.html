@@ -250,8 +250,15 @@
   .mswipe__dots { display: flex; justify-content: center; gap: .5rem; }
   .mswipe__dots i { width: .5rem; height: .5rem; border-radius: 50%; background: var(--v-hair-strong); transition: background-color .2s var(--v-ease-out), transform .2s var(--v-ease-out); }
   .mswipe__dots i.on { background: var(--v-accent); transform: scale(1.25); }
-  /* короткий экран телефона: расписание без заголовка, чтобы под ним осталось место для фото */
-  @media (max-width: 860px) and (max-height: 760px) { .shift .v-display--md { display: none; } }
+  /* телефон: расписание дня – отдельный блок под первым экраном (переносит скрипт), без подсветки от прокрутки */
+  .v-page .shift--flow { position: static; inset: auto; max-width: none; gap: var(--v-4); color: var(--v-ink); }
+  .shift--flow .shift__list { padding: 0; margin-inline: 0; }
+  .shift--flow .shift__win { --on: 0; margin-inline: 0; padding-inline: 0; }
+  .shift--flow .shift__win:first-child { border-top: 1px solid var(--v-hair-strong); }
+  .shift--flow .shift__when i { opacity: 1; transform: none; }
+  .shift--flow .shift__when, .shift--flow .shift__win b { opacity: 1; }
+  .v-page .shift--flow .shift__desc { display: block; }
+  .v-page .shift--flow .shift__cta span { display: inline; }
 
   /* ---- акт 4 · прайс: строки с временем и ценой, карточка «что входит» -------- */
   .prices { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, .6fr); gap: var(--v-9); align-items: start; }
@@ -706,8 +713,25 @@
       if (row.scrollLeft + row.clientWidth >= row.scrollWidth - 4) n = dots.length - 1;
       Array.prototype.forEach.call(dots, function (d, i) { d.classList.toggle('on', i === n); });
     }, { passive: true });
-    // На телефоне пин первого экрана короче: data-v-span из CSS не поменять, правим атрибут до монтирования.
-    document.getElementById('top').setAttribute('data-v-span', '2.6');
+    // Телефон: оффер и расписание не делят один экран – на живом телефоне инерционная прокрутка
+    // застаёт оба блока в момент смены. Оффер держится весь первый экран, расписание – отдельный блок под ним.
+    var heroAct = document.getElementById('top'), shift = heroAct.querySelector('.shift');
+    heroAct.querySelector('.hero__copy').setAttribute('data-v-cue', '0 1 0 0');
+    shift.removeAttribute('data-v-cue');
+    shift.classList.add('shift--flow');
+    var day = document.createElement('section');
+    day.className = 'v-section v-section--tight';
+    day.id = 'den';
+    day.setAttribute('data-v-act', 'flow');
+    day.setAttribute('data-v-drift', '#f6f5f0');
+    day.setAttribute('aria-label', 'Один день в салоне');
+    var wrap = document.createElement('div');
+    wrap.className = 'v-wrap';
+    wrap.appendChild(shift);
+    day.appendChild(wrap);
+    heroAct.parentNode.insertBefore(day, heroAct.nextSibling);
+    // свет на рабочем месте всё так же проходит день, но пин короче: в нём только оффер и часы
+    heroAct.setAttribute('data-v-span', '1.8');
   }
   Vibe.mount(document.querySelector('.v-page'));
 
@@ -717,7 +741,7 @@
     var fitHero = function () {
       var hero = document.querySelector('#top .hero'), photo = hero.querySelector('.hero__photo');
       var low = 0;
-      ['.hero__copy', '.shift'].forEach(function (s) { var el = hero.querySelector(s); low = Math.max(low, el.offsetTop + el.offsetHeight); });
+      ['.hero__copy', '.shift'].forEach(function (s) { var el = hero.querySelector(s); if (el) low = Math.max(low, el.offsetTop + el.offsetHeight); });
       photo.style.top = (low + 16) + 'px';
       photo.style.height = 'auto';
     };
@@ -746,7 +770,7 @@
     var last = '', live = false;
     function tick() {
       var p = parseFloat(getComputedStyle(act).getPropertyValue('--v-p')) || 0;
-      var t = hm(open + (close - open) * p), d = p < 0.33 ? 'утро' : p < 0.66 ? 'день' : 'вечер';
+      var h = open + (close - open) * p, t = hm(h), d = h < 12 ? 'утро' : h < 17 ? 'день' : 'вечер';
       if (t + d !== last) { last = t + d; out.textContent = t; part.textContent = d; }
       if (live) requestAnimationFrame(tick);
     }
