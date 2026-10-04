@@ -234,6 +234,25 @@
   }
   @media (max-width: 600px) and (max-height: 760px) { .mas__fig { height: 26svh; } .mas__one p { display: none; } }
 
+  /* телефон: мастера карточками, лента листается пальцем (собирает скрипт из разметки пина) */
+  .mswipe__head { display: grid; gap: var(--v-2); margin-bottom: var(--v-5); }
+  .mswipe { display: flex; gap: var(--v-4); overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory;
+    margin: 0 calc(-1 * var(--v-gutter)); padding: var(--v-1) var(--v-gutter) var(--v-4); scroll-padding-inline: var(--v-gutter); scrollbar-width: none; }
+  .mswipe::-webkit-scrollbar { display: none; }
+  .mswipe:focus-visible { outline: 2px solid var(--v-accent); outline-offset: 2px; }
+  .mcard { flex: 0 0 min(82%, 22rem); scroll-snap-align: start; display: grid; grid-template-rows: auto 1fr; border-radius: var(--v-radius); overflow: hidden; background: var(--v-surface); box-shadow: var(--v-e1); }
+  .mcard img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; object-position: 50% 40%; }
+  .mcard__body { padding: var(--v-5); display: grid; gap: var(--v-2); align-content: start; }
+  .mcard__body .v-label { color: var(--v-ink-soft); }
+  .mcard__body .v-display { font-size: var(--v-t-xl); }
+  .mcard__body p { color: var(--v-ink-soft); font-size: var(--v-t-sm); text-wrap: pretty; }
+  .mcard__body .mas__cta { margin-top: var(--v-2); }
+  .mswipe__dots { display: flex; justify-content: center; gap: .5rem; }
+  .mswipe__dots i { width: .5rem; height: .5rem; border-radius: 50%; background: var(--v-hair-strong); transition: background-color .2s var(--v-ease-out), transform .2s var(--v-ease-out); }
+  .mswipe__dots i.on { background: var(--v-accent); transform: scale(1.25); }
+  /* короткий экран телефона: расписание без заголовка, чтобы под ним осталось место для фото */
+  @media (max-width: 860px) and (max-height: 760px) { .shift .v-display--md { display: none; } }
+
   /* ---- акт 4 · прайс: строки с временем и ценой, карточка «что входит» -------- */
   .prices { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, .6fr); gap: var(--v-9); align-items: start; }
   .prices__head { display: grid; gap: var(--v-3); max-width: 46rem; margin-bottom: var(--v-6); }
@@ -659,12 +678,53 @@
 
 <script src="vibe.js"></script>
 <script>
-  // На телефоне пины короче: data-v-span из CSS не поменять, правим атрибут до монтирования.
-  if (window.matchMedia('(max-width: 860px)').matches) {
+  var phone = window.matchMedia('(max-width: 860px)').matches;
+
+  // Телефон: «К кому записаться» – не пин со сменой реплик, а карточки мастеров с горизонтальной прокруткой пальцем.
+  // Карточки собираем из той же разметки, чтобы тексты и цены жили в одном месте.
+  if (phone) {
+    var src = document.getElementById('mastera');
+    var arts = src.querySelectorAll('.mas__one'), imgs = src.querySelectorAll('.mas__fig img');
+    var sec = document.createElement('section');
+    sec.className = 'v-section v-section--tight';
+    sec.id = 'mastera';
+    sec.setAttribute('data-v-act', 'flow');
+    sec.setAttribute('data-v-drift', src.getAttribute('data-v-drift'));
+    sec.setAttribute('aria-label', 'Мастера');
+    var html = '<div class="v-wrap"><div class="mswipe__head"><span class="v-label">Мастера</span><h2 class="v-display v-display--md">К кому записаться</h2></div><div class="mswipe" tabindex="0" aria-label="Мастера, листаются вбок">';
+    Array.prototype.forEach.call(arts, function (a, i) {
+      var im = imgs[i];
+      html += '<article class="mcard"><img src="' + im.getAttribute('src') + '" alt="' + im.alt + '" width="900" height="1200" loading="lazy" decoding="async"><div class="mcard__body">' + a.innerHTML + '</div></article>';
+    });
+    html += '</div><div class="mswipe__dots" aria-hidden="true">' + Array.prototype.map.call(arts, function (a, i) { return '<i' + (i ? '' : ' class="on"') + '></i>'; }).join('') + '</div></div>';
+    sec.innerHTML = html;
+    src.parentNode.replaceChild(sec, src);
+    var row = sec.querySelector('.mswipe'), dots = sec.querySelectorAll('.mswipe__dots i');
+    row.addEventListener('scroll', function () {
+      var c = row.querySelector('.mcard'), step = c.offsetWidth + parseFloat(getComputedStyle(row).columnGap || 0);
+      var n = Math.min(dots.length - 1, Math.round(row.scrollLeft / step));
+      if (row.scrollLeft + row.clientWidth >= row.scrollWidth - 4) n = dots.length - 1;
+      Array.prototype.forEach.call(dots, function (d, i) { d.classList.toggle('on', i === n); });
+    }, { passive: true });
+    // На телефоне пин первого экрана короче: data-v-span из CSS не поменять, правим атрибут до монтирования.
     document.getElementById('top').setAttribute('data-v-span', '2.6');
-    document.getElementById('mastera').setAttribute('data-v-span', '2.2');
   }
   Vibe.mount(document.querySelector('.v-page'));
+
+  // Телефон: фото рабочего места начинается ниже самого длинного текста первого экрана (оффер или расписание),
+  // чтобы текст и кнопки не ложились на зеркало ни на каком размере экрана.
+  if (phone) {
+    var fitHero = function () {
+      var hero = document.querySelector('#top .hero'), photo = hero.querySelector('.hero__photo');
+      var low = 0;
+      ['.hero__copy', '.shift'].forEach(function (s) { var el = hero.querySelector(s); low = Math.max(low, el.offsetTop + el.offsetHeight); });
+      photo.style.top = (low + 16) + 'px';
+      photo.style.height = 'auto';
+    };
+    fitHero();
+    window.addEventListener('resize', fitHero);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitHero);
+  }
 
   // Шапка: подложка после 40 px прокрутки, чтобы текст секций не просвечивал.
   (function () {
