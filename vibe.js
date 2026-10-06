@@ -72,7 +72,7 @@
   /* --------------------------------------------------------- кинетика --- */
   function splitKinetic(el, mode) {
     if (el.__vk) return el.__vk;
-    var text = el.textContent.replace(/\s+/g, " ").trim();
+    var text = el.textContent.replace(/[^\S ]+/g, " ").trim(); // &nbsp; держит слова вместе
     var words = text.split(" ");
     el.textContent = "";
     var inners = [];
